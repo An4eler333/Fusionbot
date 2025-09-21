@@ -66,7 +66,7 @@ class AISystem:
                     'https://api.groq.com/openai/v1/chat/completions',
                     headers=headers,
                     json=data,
-                    timeout=aiohttp.ClientTimeout(total=10)
+                    timeout=aiohttp.ClientTimeout(total=30)
                 ) as response:
                     if response.status == 200:
                         result = await response.json()
