@@ -107,18 +107,26 @@ class DatabaseManager:
     def get_rank_info(self, rank_level: int) -> Dict:
         """Получить информацию о ранге"""
         ranks = {
-            1: {"name": "🥉 Новичок", "emoji": "🥉"},
-            2: {"name": "🏃 Активный", "emoji": "🏃"},
-            3: {"name": "💬 Болтун", "emoji": "💬"},
-            4: {"name": "🎭 Шутник", "emoji": "🎭"},
-            5: {"name": "🎯 Меткий", "emoji": "🎯"},
-            6: {"name": "⭐ Звезда", "emoji": "⭐"},
-            7: {"name": "🔥 Легенда", "emoji": "🔥"},
-            8: {"name": "👑 Король", "emoji": "👑"},
-            9: {"name": "💎 Алмаз", "emoji": "💎"},
-            10: {"name": "🚀 Космос", "emoji": "🚀"}
+            1: {"name": "🥉 Новичок", "emoji": "🥉", "exp_required": 0, "permissions": ["chat"]},
+            2: {"name": "🏃 Активный", "emoji": "🏃", "exp_required": 100, "permissions": ["chat", "voice"]},
+            3: {"name": "💬 Болтун", "emoji": "💬", "exp_required": 300, "permissions": ["chat", "voice", "reactions"]},
+            4: {"name": "🎭 Шутник", "emoji": "🎭", "exp_required": 600, "permissions": ["chat", "voice", "reactions", "jokes"]},
+            5: {"name": "🎯 Меткий", "emoji": "🎯", "exp_required": 1000, "permissions": ["chat", "voice", "reactions", "jokes", "games"]},
+            6: {"name": "⭐ Звезда", "emoji": "⭐", "exp_required": 1500, "permissions": ["chat", "voice", "reactions", "jokes", "games", "mentions"]},
+            7: {"name": "🔥 Легенда", "emoji": "🔥", "exp_required": 2500, "permissions": ["chat", "voice", "reactions", "jokes", "games", "mentions", "moderate"]},
+            8: {"name": "👑 Король", "emoji": "👑", "exp_required": 4000, "permissions": ["chat", "voice", "reactions", "jokes", "games", "mentions", "moderate", "warn"]},
+            9: {"name": "💎 Алмаз", "emoji": "💎", "exp_required": 6000, "permissions": ["chat", "voice", "reactions", "jokes", "games", "mentions", "moderate", "warn", "mute"]},
+            10: {"name": "🚀 Космос", "emoji": "🚀", "exp_required": 10000, "permissions": ["chat", "voice", "reactions", "jokes", "games", "mentions", "moderate", "warn", "mute", "kick", "ban"]}
         }
-        return ranks.get(rank_level, {"name": "🥉 Новичок", "emoji": "🥉"})
+        return ranks.get(rank_level, {"name": "🥉 Новичок", "emoji": "🥉", "exp_required": 0, "permissions": ["chat"]})
+    
+    def add_experience(self, user_id: int, exp: int):
+        """Добавить опыт пользователю"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.execute("UPDATE users SET experience = experience + ? WHERE user_id = ?", (exp, user_id))
+        except Exception as e:
+            logger.error(f"Ошибка добавления опыта: {e}")
     
     def get_top_users(self, limit: int = 10) -> List[Dict]:
         """Получить топ пользователей"""
@@ -131,6 +139,153 @@ class DatabaseManager:
         except Exception as e:
             logger.error(f"Ошибка получения топа: {e}")
             return []
+    
+    def get_user_rank(self, user_id: int) -> Dict:
+        """Получить ранг пользователя"""
+        try:
+            user = self.get_user(user_id)
+            if not user:
+                return {"rank": "🥉 Новичок", "level": 1, "experience": 0}
+            
+            exp = user.get('experience', 0)
+            level = 1
+            
+            # Определяем уровень по опыту
+            for rank_level in range(10, 0, -1):
+                rank_info = self.get_rank_info(rank_level)
+                if exp >= rank_info['exp_required']:
+                    level = rank_level
+                    break
+            
+            rank_info = self.get_rank_info(level)
+            return {
+                "rank": rank_info['name'],
+                "level": level,
+                "experience": exp,
+                "next_level_exp": self.get_rank_info(level + 1)['exp_required'] if level < 10 else 0,
+                "permissions": rank_info['permissions']
+            }
+        except Exception as e:
+            logger.error(f"Ошибка получения ранга: {e}")
+            return {"rank": "🥉 Новичок", "level": 1, "experience": 0}
+    
+    def update_rank(self, user_id: int):
+        """Обновить ранг пользователя на основе опыта"""
+        try:
+            user = self.get_user(user_id)
+            if not user:
+                return
+            
+            exp = user.get('experience', 0)
+            new_level = 1
+            
+            # Определяем новый уровень
+            for rank_level in range(10, 0, -1):
+                rank_info = self.get_rank_info(rank_level)
+                if exp >= rank_info['exp_required']:
+                    new_level = rank_level
+                    break
+            
+            # Обновляем уровень если изменился
+            if new_level != user.get('rank_level', 1):
+                with sqlite3.connect(self.db_path) as conn:
+                    conn.execute("UPDATE users SET rank_level = ? WHERE user_id = ?", (new_level, user_id))
+                logger.info(f"Пользователь {user_id} получил новый ранг: {self.get_rank_info(new_level)['name']}")
+                return True
+            return False
+        except Exception as e:
+            logger.error(f"Ошибка обновления ранга: {e}")
+            return False
+    
+    def mute_user(self, user_id: int, duration_minutes: int):
+        """Замутить пользователя"""
+        try:
+            mute_until = datetime.now().timestamp() + (duration_minutes * 60)
+            with sqlite3.connect(self.db_path) as conn:
+                conn.execute("UPDATE users SET mute_until = ? WHERE user_id = ?", (str(mute_until), user_id))
+            logger.info(f"Пользователь {user_id} замучен на {duration_minutes} минут")
+            return True
+        except Exception as e:
+            logger.error(f"Ошибка мута: {e}")
+            return False
+    
+    def unmute_user(self, user_id: int):
+        """Размутить пользователя"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.execute("UPDATE users SET mute_until = NULL WHERE user_id = ?", (user_id,))
+            logger.info(f"Пользователь {user_id} размучен")
+            return True
+        except Exception as e:
+            logger.error(f"Ошибка размута: {e}")
+            return False
+    
+    def is_muted(self, user_id: int) -> bool:
+        """Проверить замучен ли пользователь"""
+        try:
+            user = self.get_user(user_id)
+            if not user or not user.get('mute_until'):
+                return False
+            
+            mute_until = float(user['mute_until'])
+            if datetime.now().timestamp() > mute_until:
+                self.unmute_user(user_id)
+                return False
+            return True
+        except Exception as e:
+            logger.error(f"Ошибка проверки мута: {e}")
+            return False
+    
+    def ban_user(self, user_id: int):
+        """Забанить пользователя"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.execute("UPDATE users SET banned = 1 WHERE user_id = ?", (user_id,))
+            logger.info(f"Пользователь {user_id} забанен")
+            return True
+        except Exception as e:
+            logger.error(f"Ошибка бана: {e}")
+            return False
+    
+    def unban_user(self, user_id: int):
+        """Разбанить пользователя"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.execute("UPDATE users SET banned = 0 WHERE user_id = ?", (user_id,))
+            logger.info(f"Пользователь {user_id} разбанен")
+            return True
+        except Exception as e:
+            logger.error(f"Ошибка разбана: {e}")
+            return False
+    
+    def is_banned(self, user_id: int) -> bool:
+        """Проверить забанен ли пользователь"""
+        try:
+            user = self.get_user(user_id)
+            return user and user.get('banned', 0) == 1
+        except Exception as e:
+            logger.error(f"Ошибка проверки бана: {e}")
+            return False
+    
+    def add_warning(self, user_id: int):
+        """Добавить предупреждение"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.execute("UPDATE users SET warnings = warnings + 1 WHERE user_id = ?", (user_id,))
+            logger.info(f"Пользователю {user_id} добавлено предупреждение")
+            return True
+        except Exception as e:
+            logger.error(f"Ошибка добавления предупреждения: {e}")
+            return False
+    
+    def get_warnings(self, user_id: int) -> int:
+        """Получить количество предупреждений"""
+        try:
+            user = self.get_user(user_id)
+            return user.get('warnings', 0) if user else 0
+        except Exception as e:
+            logger.error(f"Ошибка получения предупреждений: {e}")
+            return 0
 
 # Глобальный экземпляр базы данных
 db = DatabaseManager()
