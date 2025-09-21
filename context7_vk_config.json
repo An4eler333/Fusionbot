@@ -1,0 +1,50 @@
+{
+  "mcpServers": {
+    "context7": {
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp"],
+      "env": {
+        "CONTEXT7_API_KEY": "your_api_key_here",
+        "CONTEXT7_BASE_URL": "https://api.context7.com",
+        "CONTEXT7_LIBRARIES": "vk-api,python-vk-api,vk-bot",
+        "CONTEXT7_DOCS_SOURCES": "vk.com/dev,github.com/vk-api,github.com/python-vk-api"
+      }
+    }
+  },
+  "context7": {
+    "libraries": [
+      {
+        "name": "vk-api",
+        "version": "5.199+",
+        "docs_url": "https://vk.com/dev",
+        "examples": true,
+        "auto_update": true
+      },
+      {
+        "name": "python-vk-api",
+        "version": "latest",
+        "docs_url": "https://github.com/python-vk-api/vk_api",
+        "examples": true,
+        "auto_update": true
+      }
+    ],
+    "auto_refresh": {
+      "enabled": true,
+      "interval": 3600,
+      "libraries": ["vk-api", "python-vk-api"]
+    },
+    "vk_api": {
+      "version": "5.199+",
+      "methods": {
+        "messages": ["send", "getConversations", "getHistory"],
+        "users": ["get", "getFollowers"],
+        "groups": ["getById", "getMembers"]
+      },
+      "rate_limits": {
+        "enabled": true,
+        "requests_per_second": 3
+      }
+    }
+  }
+}
+

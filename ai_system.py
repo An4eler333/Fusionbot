@@ -5,6 +5,8 @@ import os
 import logging
 import asyncio
 import random
+import aiohttp
+import json
 from typing import Optional
 
 logger = logging.getLogger(__name__)
@@ -14,6 +16,8 @@ class AISystem:
     
     def __init__(self):
         self.groq_api_key = os.getenv('GROQ_API_KEY')
+        self.openai_api_key = os.getenv('OPENAI_API_KEY')
+        self.huggingface_api_key = os.getenv('HUGGINGFACE_API_KEY')
         logger.info("🧠 ИИ система инициализирована")
     
     async def get_ai_response(self, message: str, context: str = "chat") -> str:
@@ -33,10 +37,62 @@ class AISystem:
             return self._get_local_response(message, context)
     
     async def _call_groq(self, message: str, context: str) -> Optional[str]:
-        """Вызов Groq API (заглушка для будущей реализации)"""
-        # TODO: Реализовать вызов Groq API
-        logger.info("Groq API недоступен, используем локальные ответы")
-        return None
+        """Вызов Groq API"""
+        if not self.groq_api_key:
+            logger.info("Groq API ключ не установлен")
+            return None
+            
+        try:
+            async with aiohttp.ClientSession() as session:
+                headers = {
+                    'Authorization': f'Bearer {self.groq_api_key}',
+                    'Content-Type': 'application/json'
+                }
+                
+                # Формируем промпт в зависимости от контекста
+                system_prompt = self._get_system_prompt(context)
+                
+                data = {
+                    "messages": [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": message}
+                    ],
+                    "model": "llama3-8b-8192",
+                    "temperature": 0.7,
+                    "max_tokens": 500
+                }
+                
+                async with session.post(
+                    'https://api.groq.com/openai/v1/chat/completions',
+                    headers=headers,
+                    json=data,
+                    timeout=aiohttp.ClientTimeout(total=10)
+                ) as response:
+                    if response.status == 200:
+                        result = await response.json()
+                        ai_response = result['choices'][0]['message']['content']
+                        logger.info("✅ Groq API ответ получен")
+                        return ai_response
+                    else:
+                        logger.warning(f"Groq API ошибка: {response.status}")
+                        return None
+                        
+        except asyncio.TimeoutError:
+            logger.warning("Groq API таймаут")
+            return None
+        except Exception as e:
+            logger.error(f"Ошибка Groq API: {e}")
+            return None
+    
+    def _get_system_prompt(self, context: str) -> str:
+        """Получить системный промпт для контекста"""
+        prompts = {
+            "chat": "Ты дружелюбный помощник в VK чате. Отвечай кратко, весело и по-русски. Используй эмодзи.",
+            "joke": "Ты мастер шуток. Придумай смешную шутку на русском языке с эмодзи.",
+            "story": "Ты рассказчик. Создай короткую интересную историю на русском языке с эмодзи.",
+            "compliment": "Ты мастер комплиментов. Скажи что-то приятное и ободряющее на русском языке с эмодзи."
+        }
+        return prompts.get(context, prompts["chat"])
     
     def _get_local_response(self, message: str, context: str) -> str:
         """Локальные умные ответы"""

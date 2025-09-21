@@ -1,0 +1,21 @@
+{
+  "auto_context7": {
+    "enabled": true,
+    "keywords": [
+      "vk api",
+      "vk-api",
+      "vk_api",
+      "python vk",
+      "python-vk",
+      "vk bot",
+      "vk-bot",
+      "vk_bot",
+      "актуальная документация",
+      "latest documentation"
+    ],
+    "auto_enhance": true,
+    "check_versions": true,
+    "get_practices": true
+  },
+  "last_setup": "2025-09-21T19:32:07.746165"
+}

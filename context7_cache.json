@@ -1,0 +1,81 @@
+{
+  "last_refresh": "2025-09-21T19:32:12.479436",
+  "vk_api": {
+    "version": "5.199",
+    "last_updated": "2025-09-21T19:32:12.479582",
+    "methods": {
+      "messages": {
+        "send": {
+          "description": "Отправка сообщения",
+          "parameters": [
+            "peer_id",
+            "message",
+            "random_id"
+          ],
+          "example": "vk.messages.send(peer_id=2000000001, message='Привет!', random_id=get_random_id())"
+        },
+        "getConversations": {
+          "description": "Получение списка бесед",
+          "parameters": [
+            "count",
+            "offset"
+          ],
+          "example": "vk.messages.getConversations(count=20)"
+        }
+      },
+      "users": {
+        "get": {
+          "description": "Получение информации о пользователях",
+          "parameters": [
+            "user_ids",
+            "fields"
+          ],
+          "example": "vk.users.get(user_ids=[1, 2, 3])"
+        }
+      },
+      "groups": {
+        "getById": {
+          "description": "Получение информации о группах",
+          "parameters": [
+            "group_id",
+            "fields"
+          ],
+          "example": "vk.groups.getById(group_id=1)"
+        }
+      }
+    },
+    "rate_limits": {
+      "requests_per_second": 3,
+      "requests_per_day": 10000
+    },
+    "best_practices": [
+      "Используйте Long Poll для получения сообщений",
+      "Применяйте rate limiting (3 сек между сообщениями)",
+      "Работайте только с беседами (peer_id > 2000000000)",
+      "Всегда проверяйте валидность токенов"
+    ]
+  },
+  "python_libs": {
+    "last_updated": "2025-09-21T19:32:12.479817",
+    "libraries": {
+      "vk-api": {
+        "version": "11.10.0",
+        "description": "Python библиотека для работы с VK API",
+        "installation": "pip install vk-api==11.10.0",
+        "basic_usage": "\nimport vk_api\nfrom vk_api.longpoll import VkLongPoll, VkEventType\n\n# Инициализация\nvk_session = vk_api.VkApi(token='your_token')\nvk = vk_session.get_api()\nlongpoll = VkLongPoll(vk_session)\n\n# Обработка сообщений\nfor event in longpoll.listen():\n    if event.type == VkEventType.MESSAGE_NEW:\n        if event.to_me:\n            vk.messages.send(\n                user_id=event.user_id,\n                message='Привет!',\n                random_id=get_random_id()\n            )\n                    ",
+        "async_usage": "\nimport asyncio\nimport aiohttp\n\nasync def send_message_async(peer_id, message):\n    async with aiohttp.ClientSession() as session:\n        url = \"https://api.vk.com/method/messages.send\"\n        params = {\n            'peer_id': peer_id,\n            'message': message,\n            'access_token': token,\n            'v': '5.199'\n        }\n        async with session.post(url, params=params) as response:\n            return await response.json()\n                    "
+      },
+      "aiohttp": {
+        "version": "3.12.15",
+        "description": "Асинхронная HTTP библиотека",
+        "installation": "pip install aiohttp==3.12.15"
+      },
+      "python-dotenv": {
+        "version": "1.1.1",
+        "description": "Загрузка переменных окружения из .env файлов",
+        "installation": "pip install python-dotenv==1.1.1"
+      }
+    }
+  },
+  "context7_status": false
+}
