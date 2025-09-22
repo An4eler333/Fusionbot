@@ -123,9 +123,7 @@
 
 ### Приоритеты:
 1. **OpenRouter** (основной) - 5 бесплатных моделей
-2. **Groq** (fallback)
-3. **OpenAI** (fallback)
-4. **Hugging Face** (fallback)
+2. Удалены Groq/OpenAI/Hugging Face; используем OpenRouter
 
 ### Очистка ответов:
 - Удаление специальных токенов (`<s>`, `</s>`)

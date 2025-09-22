@@ -59,7 +59,7 @@ class VKBotClean:
         
         logger.info(f"🤖 VK Бот инициализирован. ID группы: {self.group_id}")
         logger.info(f"🎯 Работаем в беседах через Bots Long Poll")
-        logger.info(f"🧠 ИИ система: Hugging Face + Polza AI + OpenRouter")
+        logger.info(f"🧠 ИИ система: OpenRouter")
         logger.info(f"💾 База данных: SQLite")
     
     def _init_group_longpoll(self):
@@ -280,7 +280,7 @@ class VKBotClean:
             elif message_lower in ['помощь', 'help', 'команды']:
                 help_text = """🤖 **Fusionbot v6.1 - Команды:**
 
-**🧠 ИИ команды (Hugging Face + Polza AI + OpenRouter):**
+**🧠 ИИ команды (OpenRouter):**
 • `ии [вопрос]` - Задать вопрос ИИ
 • `шутка` - Получить шутку
 • `история` - Случайная история
@@ -443,7 +443,7 @@ class VKBotClean:
 💬 ID чата: {peer_id}
 🔧 Режим: Bots Long Poll
 
-🤖 ИИ система: Hugging Face + Polza AI + OpenRouter
+🤖 ИИ система: OpenRouter
 🚫 Локальные fallback отключены"""
                 self.send_message(peer_id, stats_text)
                 

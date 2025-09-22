@@ -58,7 +58,7 @@ console_admin.py - Админская панель
 #### Fallback система для ИИ
 **Решение:** Создать многоуровневую систему ответов
 **Уровни:**
-1. Groq API (внешний сервис)
+1. OpenRouter API (внешний сервис)
 2. Локальные умные ответы
 3. Стандартные ответы
 
@@ -146,7 +146,7 @@ except Exception as e:
 ```env
 VK_TOKEN=vk1.a.xxx
 VK_GROUP_ID=232745249
-GROQ_API_KEY=gsk_xxx
+OPENROUTER_API_KEY=sk-or-xxx
 ```
 
 **Преимущества:**

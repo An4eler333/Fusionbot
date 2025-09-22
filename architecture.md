@@ -39,13 +39,13 @@ class VKBot:
 **Назначение:** Система искусственного интеллекта с fallback
 
 **Ответственности:**
-- Интеграция с Groq API
+- Интеграция с OpenRouter API
 - Локальные умные ответы
 - Генерация контента (шутки, истории, комплименты)
 - Контекстная обработка сообщений
 
 **Архитектурные решения:**
-- Приоритет внешнего API (Groq) над локальными ответами
+- Использование только внешнего API OpenRouter
 - Множественные fallback уровни
 - Контекстные ответы для разных ситуаций
 
@@ -53,7 +53,7 @@ class VKBot:
 ```python
 class AISystem:
     async def get_ai_response()     # Основной метод получения ответа
-    async def _call_groq()         # Вызов Groq API
+    async def _call_openrouter()   # Вызов OpenRouter API
     def _get_local_response()      # Локальные ответы
     async def generate_joke()      # Генерация шуток
     async def generate_story()     # Генерация историй
