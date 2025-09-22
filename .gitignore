@@ -1,0 +1,22 @@
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environments
+.venv/
+venv/
+
+# Logs and DB
+bot.log
+moderation.log
+vk_bot.db
+
+# Env files (DO NOT COMMIT TOKENS)
+*.env
+ТОКЕНЫ.env
+
+# OS metadata
+.DS_Store
+Thumbs.db
+

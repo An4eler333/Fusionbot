@@ -23,7 +23,16 @@ class TestDatabaseManager:
         """Очистка после каждого теста"""
         # Удаляем временную базу данных
         if os.path.exists(self.temp_db.name):
-            os.unlink(self.temp_db.name)
+            try:
+                os.unlink(self.temp_db.name)
+            except PermissionError:
+                # Windows может удерживать файл БД; пробуем повременить и удалить позже
+                import time
+                time.sleep(0.1)
+                try:
+                    os.unlink(self.temp_db.name)
+                except Exception:
+                    pass
     
     def test_database_initialization(self):
         """Тест инициализации базы данных"""
@@ -294,7 +303,15 @@ class TestDatabaseIntegration:
         finally:
             # Очищаем временную базу
             if os.path.exists(temp_db.name):
-                os.unlink(temp_db.name)
+                try:
+                    os.unlink(temp_db.name)
+                except PermissionError:
+                    import time
+                    time.sleep(0.1)
+                    try:
+                        os.unlink(temp_db.name)
+                    except Exception:
+                        pass
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

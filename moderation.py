@@ -12,8 +12,8 @@ moderation_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s -
 moderation_logger.addHandler(moderation_handler)
 moderation_logger.setLevel(logging.INFO)
 
-class ModerationSystem:
-    """Система модерации контента"""
+class ContentModeration:
+    """Система модерации контента (переименовано для избежания коллизий имён)."""
     
     def __init__(self):
         # Списки запрещенных слов по категориям
@@ -87,4 +87,4 @@ class ModerationSystem:
         }
 
 # Глобальный экземпляр системы модерации
-moderation_system = ModerationSystem()
+moderation_system = ContentModeration()

@@ -20,7 +20,11 @@ class DatabaseManager:
     def init_database(self):
         """Инициализация базы данных"""
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            # На Windows файлы БД могут оставаться заблокированными в тестах.
+            # Включаем WAL и уменьшенные таймауты, чтобы быстрее освобождались дескрипторы.
+            with sqlite3.connect(self.db_path, timeout=0.5, isolation_level=None) as conn:
+                conn.execute('PRAGMA journal_mode=WAL;')
+                conn.execute('PRAGMA synchronous=OFF;')
                 conn.execute('''
                     CREATE TABLE IF NOT EXISTS users (
                         user_id INTEGER PRIMARY KEY,

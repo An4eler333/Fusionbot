@@ -6,9 +6,7 @@ VK Бот - ЧИСТАЯ версия для работы в беседах
 import os
 import asyncio
 import logging
-import json
 import time
-import sqlite3
 import random
 import requests
 from datetime import datetime
@@ -57,10 +55,11 @@ class VKBotClean:
         # Статистика
         self.start_time = datetime.now()
         self.messages_processed = 0
+        self._last_send_time = 0.0
         
         logger.info(f"🤖 VK Бот инициализирован. ID группы: {self.group_id}")
         logger.info(f"🎯 Работаем в беседах через Bots Long Poll")
-        logger.info(f"🧠 ИИ система: OpenRouter + Groq + OpenAI + Hugging Face")
+        logger.info(f"🧠 ИИ система: Hugging Face + Polza AI + OpenRouter")
         logger.info(f"💾 База данных: SQLite")
     
     def _init_group_longpoll(self):
@@ -93,9 +92,88 @@ class VKBotClean:
             logger.error(f"❌ Ошибка инициализации Long Poll: {e}")
             raise
     
+    def is_vk_group_admin(self, user_id: int) -> bool:
+        """Проверить, является ли пользователь администратором VK группы"""
+        try:
+            response = requests.get(
+                'https://api.vk.com/method/groups.getMembers',
+                params={
+                    'group_id': self.group_id,
+                    'filter': 'managers',
+                    'access_token': self.vk_token,
+                    'v': '5.199'
+                }
+            )
+            
+            data = response.json()
+            if 'response' in data and 'items' in data['response']:
+                admin_ids = data['response']['items']
+                return user_id in admin_ids
+            
+            return False
+        except Exception as e:
+            logger.error(f"❌ Ошибка проверки админа VK группы: {e}")
+            return False
+    
+    def get_user_permissions(self, user_id: int, peer_id: int) -> Dict:
+        """Получить права пользователя (VK админ + ранг в боте)"""
+        permissions = {
+            'is_vk_admin': False,
+            'is_bot_admin': False,
+            'rank_level': 1,
+            'rank_name': '🥉 Новичок',
+            'permissions': ['chat']
+        }
+        
+        try:
+            # Проверяем VK группу админа
+            permissions['is_vk_admin'] = self.is_vk_group_admin(user_id)
+            
+            # Если VK админ - автоматически максимальные права
+            if permissions['is_vk_admin']:
+                permissions['is_bot_admin'] = True
+                permissions['rank_level'] = 10
+                permissions['rank_name'] = '🚀 Космос'
+                permissions['permissions'] = [
+                    'chat', 'voice', 'reactions', 'jokes', 'games', 
+                    'mentions', 'moderate', 'warn', 'mute', 'kick', 'ban'
+                ]
+                return permissions
+            
+            # Проверяем ранг в боте
+            user_data = db.get_user(user_id)
+            if user_data:
+                rank_info = db.get_rank_info(user_data.get('rank_level', 1))
+                permissions['rank_level'] = user_data.get('rank_level', 1)
+                permissions['rank_name'] = rank_info['name']
+                permissions['permissions'] = rank_info['permissions']
+            
+            # Проверяем админа в конкретной беседе
+            chat_id = peer_id - 2000000000
+            if db.is_admin(user_id, chat_id):
+                permissions['is_bot_admin'] = True
+                # Админы беседы получают права 8+ ранга
+                if permissions['rank_level'] < 8:
+                    permissions['rank_level'] = 8
+                    permissions['rank_name'] = '👑 Король'
+                    permissions['permissions'] = [
+                        'chat', 'voice', 'reactions', 'jokes', 'games', 
+                        'mentions', 'moderate', 'warn', 'mute'
+                    ]
+            
+        except Exception as e:
+            logger.error(f"❌ Ошибка получения прав пользователя: {e}")
+        
+        return permissions
+    
     def send_message(self, peer_id: int, message: str):
         """Отправка сообщения в беседу"""
         try:
+            # Rate limiting: не чаще 1 сообщения в 3 секунды
+            elapsed = time.time() - self._last_send_time
+            if elapsed < 3.0:
+                time.sleep(max(0.0, 3.0 - elapsed))
+
             # Ограничиваем длину сообщения (VK лимит ~4096 символов)
             if len(message) > 4000:
                 message = message[:4000] + "..."
@@ -120,15 +198,19 @@ class VKBotClean:
                 data = response.json()
                 if 'response' in data:
                     logger.info(f"✅ Сообщение отправлено в {peer_id}")
+                    self._last_send_time = time.time()
                     return True
                 elif 'error' in data:
                     logger.error(f"❌ VK API ошибка: {data['error']}")
+                    self._last_send_time = time.time()
                     return False
                 else:
                     logger.error(f"❌ Неожиданный ответ VK API: {data}")
+                    self._last_send_time = time.time()
                     return False
             except ValueError as e:
                 logger.error(f"❌ Ошибка парсинга JSON: {e}, ответ: {response.text[:200]}")
+                self._last_send_time = time.time()
                 return False
                 
         except Exception as e:
@@ -198,11 +280,14 @@ class VKBotClean:
             elif message_lower in ['помощь', 'help', 'команды']:
                 help_text = """🤖 **Fusionbot v6.1 - Команды:**
 
-**🧠 ИИ команды:**
+**🧠 ИИ команды (Hugging Face + Polza AI + OpenRouter):**
 • `ии [вопрос]` - Задать вопрос ИИ
 • `шутка` - Получить шутку
 • `история` - Случайная история
 • `комплимент` - Получить комплимент
+• `время` - Узнать время
+• `как дела` - Спросить о настроении
+• `расскажи о себе` - Узнать о боте
 
 **📊 Ранги и опыт:**
 • `ранг` - Ваш ранг и опыт
@@ -228,7 +313,9 @@ class VKBotClean:
 
 **ℹ️ Справка:**
 • `админ` - Админские команды
-• `ранги` - Информация о рангах"""
+• `ранги` - Информация о рангах
+
+**👑 VK админы группы автоматически получают максимальные права!**"""
                 self.send_message(peer_id, help_text)
                 
             elif message_lower.startswith('ии ') and len(text) > 3:
@@ -238,27 +325,46 @@ class VKBotClean:
                 self.send_message(peer_id, f"🧠 {ai_response}")
                 
             elif message_lower in ['шутка', 'joke']:
-                joke = asyncio.run(ai_system.get_ai_response("создай шутку", "joke", user_id, peer_id))
+                joke = asyncio.run(ai_system.get_ai_response("Расскажи смешную шутку или анекдот", "joke", user_id, peer_id))
                 self.send_message(peer_id, f"😂 {joke}")
                 
             elif message_lower in ['история', 'story']:
-                story = asyncio.run(ai_system.get_ai_response("создай историю", "story", user_id, peer_id))
-                self.send_message(peer_id, story)
+                story = asyncio.run(ai_system.get_ai_response("Расскажи короткую интересную историю", "story", user_id, peer_id))
+                self.send_message(peer_id, f"📖 {story}")
                 
             elif message_lower in ['комплимент', 'compliment']:
-                compliment = asyncio.run(ai_system.get_ai_response("скажи комплимент", "compliment", user_id, peer_id))
-                self.send_message(peer_id, compliment)
+                compliment = asyncio.run(ai_system.get_ai_response("Сделай искренний комплимент", "compliment", user_id, peer_id))
+                self.send_message(peer_id, f"💝 {compliment}")
+                
+            elif message_lower in ['время', 'time']:
+                time_response = asyncio.run(ai_system.get_ai_response("Скажи текущее время", "chat", user_id, peer_id))
+                self.send_message(peer_id, f"⏰ {time_response}")
+                
+            elif message_lower in ['как дела', 'how are you']:
+                mood_response = asyncio.run(ai_system.get_ai_response("Как дела? Расскажи о своем настроении", "chat", user_id, peer_id))
+                self.send_message(peer_id, f"😊 {mood_response}")
+                
+            elif message_lower in ['расскажи о себе', 'about you']:
+                about_response = asyncio.run(ai_system.get_ai_response("Расскажи о себе", "chat", user_id, peer_id))
+                self.send_message(peer_id, f"🤖 {about_response}")
                 
             elif message_lower in ['ранг', 'rank']:
+                user_perms = self.get_user_permissions(user_id, peer_id)
                 user_rank = db.get_user_rank(user_id)
                 next_exp = user_rank.get('next_level_exp', 0)
                 exp_to_next = next_exp - user_rank['experience'] if next_exp > 0 else 0
                 
-                rank_info = f"""📊 **Ваш ранг: {user_rank['rank']}**
+                admin_status = ""
+                if user_perms['is_vk_admin']:
+                    admin_status = "\n👑 **VK Администратор группы**"
+                elif user_perms['is_bot_admin']:
+                    admin_status = "\n🔧 **Администратор беседы**"
+                
+                rank_info = f"""📊 **Ваш ранг: {user_perms['rank_name']}**
 💎 Опыт: {user_rank['experience']}
 🏆 Уровень: {user_rank['level']}
 🎯 До следующего уровня: {exp_to_next} опыта
-🔑 Права: {', '.join(user_rank.get('permissions', []))}"""
+🔑 Права: {', '.join(user_perms['permissions'])}{admin_status}"""
                 self.send_message(peer_id, rank_info)
                 
             elif message_lower in ['топ', 'top']:
@@ -337,11 +443,17 @@ class VKBotClean:
 💬 ID чата: {peer_id}
 🔧 Режим: Bots Long Poll
 
-🤖 ИИ система: OpenRouter + Groq + OpenAI + Hugging Face
-🔄 Fallback система активна"""
+🤖 ИИ система: Hugging Face + Polza AI + OpenRouter
+🚫 Локальные fallback отключены"""
                 self.send_message(peer_id, stats_text)
                 
             elif message_lower.startswith('кик ') and len(text) > 4:
+                # Проверяем права на кик
+                user_perms = self.get_user_permissions(user_id, peer_id)
+                if 'kick' not in user_perms['permissions']:
+                    self.send_message(peer_id, f"❌ Недостаточно прав для кика. Ваш ранг: {user_perms['rank_name']}")
+                    return
+                
                 # Парсим команду кика
                 parts = text.split()
                 if len(parts) >= 2:
@@ -355,6 +467,12 @@ class VKBotClean:
                     self.send_message(peer_id, "❌ Использование: `кик @пользователь`")
                     
             elif message_lower.startswith('мут ') and len(text) > 4:
+                # Проверяем права на мут
+                user_perms = self.get_user_permissions(user_id, peer_id)
+                if 'mute' not in user_perms['permissions']:
+                    self.send_message(peer_id, f"❌ Недостаточно прав для мута. Ваш ранг: {user_perms['rank_name']}")
+                    return
+                
                 # Парсим команду мута
                 parts = text.split()
                 if len(parts) >= 3:
@@ -373,6 +491,12 @@ class VKBotClean:
                     self.send_message(peer_id, "❌ Использование: `мут @пользователь [время_в_минутах] [причина]`")
                     
             elif message_lower.startswith('бан ') and len(text) > 4:
+                # Проверяем права на бан
+                user_perms = self.get_user_permissions(user_id, peer_id)
+                if 'ban' not in user_perms['permissions']:
+                    self.send_message(peer_id, f"❌ Недостаточно прав для бана. Ваш ранг: {user_perms['rank_name']}")
+                    return
+                
                 # Парсим команду бана
                 parts = text.split()
                 if len(parts) >= 2:
@@ -387,6 +511,12 @@ class VKBotClean:
                     self.send_message(peer_id, "❌ Использование: `бан @пользователь [причина]`")
                     
             elif message_lower.startswith('варн ') and len(text) > 5:
+                # Проверяем права на предупреждение
+                user_perms = self.get_user_permissions(user_id, peer_id)
+                if 'warn' not in user_perms['permissions']:
+                    self.send_message(peer_id, f"❌ Недостаточно прав для предупреждения. Ваш ранг: {user_perms['rank_name']}")
+                    return
+                
                 # Парсим команду предупреждения
                 parts = text.split()
                 if len(parts) >= 2:
@@ -431,7 +561,14 @@ class VKBotClean:
                     self.send_message(peer_id, "❌ Использование: `разбан @пользователь`")
                     
             elif message_lower in ['админ', 'admin']:
-                admin_text = """🔧 **Админские команды:**
+                user_perms = self.get_user_permissions(user_id, peer_id)
+                
+                if not user_perms['is_vk_admin'] and not user_perms['is_bot_admin']:
+                    self.send_message(peer_id, f"❌ У вас нет прав администратора. Ваш ранг: {user_perms['rank_name']}")
+                    return
+                
+                admin_type = "VK Администратор группы" if user_perms['is_vk_admin'] else "Администратор беседы"
+                admin_text = f"""🔧 **Админские команды** ({admin_type}):
 
 **📊 Статистика:**
 • `статистика` - Общая статистика
@@ -453,7 +590,9 @@ class VKBotClean:
 **ℹ️ Справка:**
 • `тест` - Проверка работы
 • `помощь` - Список команд
-• `ранги` - Информация о рангах"""
+• `ранги` - Информация о рангах
+
+**🔑 Ваши права:** {', '.join(user_perms['permissions'])}"""
                 self.send_message(peer_id, admin_text)
                 
             elif any(word in message_lower for word in ['привет', 'hello', 'hi']):
